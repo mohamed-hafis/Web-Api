@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Web.Http;
+using static MyApi.Models.SampleformModel;
 
 namespace MyApi.Controllers
 {
@@ -366,29 +367,5 @@ namespace MyApi.Controllers
                 return InternalServerError(new Exception("An unexpected error occurred during delete.", ex));
             }
         }
-
-
-
-        public class SampleRecord
-        {
-            public string CID { get; set; }
-            public string MenuID { get; set; }
-            public string MenuName { get; set; }
-            public string SqlQuery1 { get; set; }
-            public string SqlQuery2 { get; set; }
-            public string RelationColumn1 { get; set; }
-            public string RelationColumn2 { get; set; }
-            public string FormatColumn { get; set; }
-            public string CompanyName { get; set; }
-        }
-
-
-        public class SampleRecord1
-        {
-            public string MenuID { get; set; }
-            public string MenuName { get; set; }
-        }
-
-
     }
 }
