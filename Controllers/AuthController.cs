@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -11,6 +11,8 @@ using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
+using static MyApi.Models.AuthModel;
+
 
 namespace MyApi.Controllers
 {
@@ -187,22 +189,4 @@ namespace MyApi.Controllers
 
 
     }
-
-   
-
-    // Assuming you have a LoginRequest class
-    public class LoginRequest
-    {
-        public string UserName { get; set; }
-        public string Password { get; set; }
-    }
-
-    public class SignupRequest
-    {
-        public string UserName { get; set; }
-        public string Password { get; set; }
-        public string ConfirmPassword { get; set; }
-
-    }
-
 }
