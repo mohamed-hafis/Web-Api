@@ -6,7 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Web.Http;
-using static MyApi.Models.SampleformModel;
+using static MyApi.Models.Sampleform;
 
 namespace MyApi.Controllers
 {
