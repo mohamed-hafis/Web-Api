@@ -6,7 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Web.Http;
-using static MyApi.Models.MenuGrpModel;
+using static MyApi.Models.MenuGroup;
 
 namespace MyApi.Controllers 
 {
@@ -92,10 +92,27 @@ namespace MyApi.Controllers
                                 });
                             }
                         }
+
                         if (reader.NextResult())
                         {
                             while (reader.Read())
                             {
+                                string optionsJson = reader["Options"].ToString(); // Read as string
+                                List<object> optionsList = new List<object>();
+
+                                // Try parsing the JSON string into a List<object>
+                                if (!string.IsNullOrEmpty(optionsJson))
+                                {
+                                    try
+                                    {
+                                        optionsList = Newtonsoft.Json.JsonConvert.DeserializeObject<List<object>>(optionsJson);
+                                    }
+                                    catch (Exception)
+                                    {
+                                        optionsList = new List<object>(); // Fallback in case of parsing error
+                                    }
+                                }
+
                                 menumgt.Add(new
                                 {
                                     CID = reader["CID"],
@@ -105,15 +122,14 @@ namespace MyApi.Controllers
                                     Description = reader["Description"],
                                     Reserved = reader["Reserved"],
                                     ApplicationType = reader["ApplicationType"],
+                                    Options = optionsList, // Now correctly parsed as JSON array
                                     WebIcon = reader["WebIcon"],
-
                                 });
                             }
                         }
-                    }
-                }
+                    }}
 
-                return Ok(new
+                    return Ok(new
                 {
                     Companies = companies,
                     Menus = menus,
@@ -227,11 +243,11 @@ namespace MyApi.Controllers
 
                 if (resultMessage.Contains("Update failed: A record with the same values already exists"))
                 {
-                    return Content(HttpStatusCode.Conflict, new { message = resultMessage }); // 409 Conflict
+                    return Content(HttpStatusCode.Conflict, new { message = resultMessage });
                 }
                 else if (resultMessage.Contains("Update failed, record not found"))
                 {
-                    return Content(HttpStatusCode.NotFound, new { message = resultMessage }); // 404 Not Found
+                    return Content(HttpStatusCode.NotFound, new { message = resultMessage }); 
                 }
                 else if (resultMessage.Contains("Record updated successfully"))
                 {
@@ -239,7 +255,7 @@ namespace MyApi.Controllers
                 }
                 else
                 {
-                    return Content(HttpStatusCode.BadRequest, new { message = "Unexpected error occurred" }); // 400 Bad Request
+                    return Content(HttpStatusCode.BadRequest, new { message = "Unexpected error occurred" }); 
                 }
             }
         }
@@ -376,6 +392,7 @@ namespace MyApi.Controllers
                     cmd.Parameters.AddWithValue("@Description", formData.Description ?? (object)DBNull.Value);
                     cmd.Parameters.AddWithValue("@Reserved", formData.Reserved);
                     cmd.Parameters.AddWithValue("@ApplicationType", formData.ApplicationType);
+                    cmd.Parameters.AddWithValue("@Options", string.IsNullOrEmpty(formData.Options) ? (object)DBNull.Value : formData.Options);
                     cmd.Parameters.AddWithValue("@WebIcon", formData.WebIcon ?? (object)DBNull.Value);
 
                     // Output parameter
