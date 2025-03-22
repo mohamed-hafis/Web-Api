@@ -7,7 +7,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Web.Http;
-using static MyApi.Models.EmployeeModel;
+using static MyApi.Models.Employee;
 
 namespace MyApi.Controllers
 {
