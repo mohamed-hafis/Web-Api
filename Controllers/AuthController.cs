@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Data;
 using System.Text;
 using System.Data.SqlClient;
@@ -10,9 +8,8 @@ using System.Web.Http;
 using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
-using System.Security.Cryptography;
-using static MyApi.Models.AuthModel;
-
+using static MyApi.Models.Auth;
+using System.Web.Http.Controllers;
 
 namespace MyApi.Controllers
 {
@@ -47,18 +44,21 @@ namespace MyApi.Controllers
                         cmd.Parameters.AddWithValue("@Action", "Login");
                         cmd.Parameters.AddWithValue("@UserName", request.UserName);
                         cmd.Parameters.AddWithValue("@Password", request.Password);
+                        cmd.Parameters.Add("@UserRole", SqlDbType.NVarChar, 20).Direction = ParameterDirection.Output;
+
 
                         cmd.Parameters.Add("@Status", SqlDbType.Bit).Direction = ParameterDirection.Output;
 
                         cmd.ExecuteNonQuery();
 
                         bool isAuthenticated = (bool)cmd.Parameters["@Status"].Value;
+                        string userRole = cmd.Parameters["@UserRole"].Value.ToString(); 
 
                         if (isAuthenticated)
                         {
-                            var token = GenerateJwtToken(request.UserName);
+                            var token = GenerateJwtToken(request.UserName, userRole);
                             Console.WriteLine("Generated Token: " + token);
-                            return Ok(new { Message = "Login successful", Token = token });
+                            return Ok(new { Message = "Login successful", Token = token, Role = userRole });
                         }
                         else
                         {
@@ -96,7 +96,9 @@ namespace MyApi.Controllers
         public IHttpActionResult Signup(SignupRequest request)
         {
             // Validate the input
-            if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Password) || string.IsNullOrWhiteSpace(request.ConfirmPassword))
+            if (string.IsNullOrWhiteSpace(request.UserName) || 
+                string.IsNullOrWhiteSpace(request.Password) || 
+                string.IsNullOrWhiteSpace(request.ConfirmPassword))
             {
                 return BadRequest("Username and password are required");
             }
@@ -124,6 +126,7 @@ namespace MyApi.Controllers
                         cmd.Parameters.AddWithValue("@Action", "Signup");
                         cmd.Parameters.AddWithValue("@UserName", request.UserName);
                         cmd.Parameters.AddWithValue("@Password", request.Password);
+                        cmd.Parameters.AddWithValue("@UserRole", request.Role); 
 
                         // Output parameter for status
                         cmd.Parameters.Add("@Status", SqlDbType.Bit).Direction = ParameterDirection.Output;
@@ -155,8 +158,91 @@ namespace MyApi.Controllers
             }
         }
 
-      
-        private string GenerateJwtToken(string userName)
+        [AuthorizeRole("Admin")]
+        [HttpGet]
+        [Route("GetAllUsers")]
+        public IHttpActionResult GetAllUsers()
+        {
+            try
+            {
+                using (SqlConnection conn = new SqlConnection(connectionString))
+                {
+                    conn.Open();
+                    using (SqlCommand cmd = new SqlCommand("GetAllUsers", conn))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+
+                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            List<object> users = new List<object>();
+
+                            while (reader.Read())
+                            {
+                                users.Add(new
+                                {
+                                    UserName = reader["UserName"].ToString(),
+                                    Role = reader["Role"].ToString()
+                                });
+                            }
+
+                            return Ok(users);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return InternalServerError(new Exception("Error retrieving users.", ex));
+            }
+        }
+
+        public class AuthorizeRoleAttribute : AuthorizeAttribute
+        {
+            private readonly string[] allowedRoles;
+
+            public AuthorizeRoleAttribute(params string[] roles)
+            {
+                this.allowedRoles = roles;
+            }
+
+            public override void OnAuthorization(HttpActionContext actionContext)
+            {
+                if (actionContext.RequestContext.Principal.Identity is ClaimsIdentity identity && identity.IsAuthenticated)
+                {
+                    var userRole = identity.FindFirst(ClaimTypes.Role)?.Value;
+
+                    if (!string.IsNullOrEmpty(userRole) && allowedRoles.Contains(userRole))
+                    {
+                        return; // User is authorized, proceed with request
+                    }
+                }
+
+                // User is unauthorized
+                actionContext.Response = new System.Net.Http.HttpResponseMessage(System.Net.HttpStatusCode.Forbidden)
+                {
+                    Content = new System.Net.Http.StringContent("You are not authorized to access this resource.")
+                };
+            }
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpGet]
+        [Route("AdminDashboard")]
+        public IHttpActionResult GetAdminDashboard()
+        {
+            return Ok("Welcome Admin! You have access to this route.");
+        }
+
+        [Authorize(Roles = "Admin,Employee")]
+        [HttpGet]
+        [Route("EmployeeDashboard")]
+        public IHttpActionResult GetEmployeeDashboard()
+        {
+            return Ok("Welcome Employee! You have access.");
+        }
+
+
+        private string GenerateJwtToken(string userName, string role)
         {
             // Use a secure key for signing
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SecretKey));
@@ -168,6 +254,7 @@ namespace MyApi.Controllers
         new Claim(JwtRegisteredClaimNames.Sub, userName),  // Subject (user name)
         new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),  // Unique JWT ID
         new Claim(JwtRegisteredClaimNames.Iat, DateTime.UtcNow.ToString(), ClaimValueTypes.DateTime),  // Issued At (optional)
+         new Claim(ClaimTypes.Role, role) // Add role claim
     };
 
             // You can add roles or other claims if required
